@@ -7,14 +7,14 @@
  * @param message メッセージ
  */
 function sendMessageToSlack(channelName, userName, iconName, message) {
-    const slackWebHookUrl = 'https://hooks.slack.com/services/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';
+    const slackWebHookUrl = 'https://hooks.slack.com/services/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';
 
     const jsonData =
         {
-            "channel": channelName,
-            "username": userName,
-            "icon_emoji": iconName,
-            "text": message
+            "channel": channelName || "#random",
+            "username": userName || "Bot",
+            "icon_emoji": iconName || ":robot_face:",
+            "text": message || "no message"
         };
     const payload = JSON.stringify(jsonData);
 
