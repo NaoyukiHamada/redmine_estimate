@@ -1,0 +1,11 @@
+{
+  "name": "redmine_estimate",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/NaoyukiHamada/redmine_estimate.git",
+  "author": "Naoyuki Hamada <hamadanaoyuki00@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@types/google-apps-script": "^0.0.62"
+  }
+}
