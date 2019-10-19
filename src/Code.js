@@ -5,7 +5,8 @@
 //gasのバグによりconstでエラーになるので、varを使用
 var SheetName = {
     SLACK_SETTING: 'SlackSetting',
-    MESSAGE_TEMPLATE: 'MessageTemplate'
+    MESSAGE_TEMPLATE: 'MessageTemplate',
+    SEND_TEST: "テスト配信"
 };
 
 /**
@@ -57,9 +58,14 @@ var ACTUAL_WORKING_HOURS = 7;
  * @param userName ユーザー名
  * @param iconName アイコン名 カスタム絵文字を利用可能 e.g. :memo:
  * @param message メッセージ
+ * @param isTest テスト配信時はtrue
  */
-function sendMessageToSlack(channelName, userName, iconName, message) {
+function sendMessageToSlack(channelName, userName, iconName, message, isTest) {
     const slackSendMessageUrl = 'https://slack.com/api/chat.postMessage';
+
+    if (isTest != null && isTest) {
+        message = '*テスト配信*\n\n' + message;
+    }
 
     const payload =
         {
@@ -82,20 +88,21 @@ function sendMessageToSlack(channelName, userName, iconName, message) {
 
 /**
  * 特定のSlack設定に応じて、もしくは全てのSlack設定に応じて、Slackに通知
- * @param slackSettingId
+ * @param slackSettingId 特定の設定に応じて通知を行いたいときに入力。全てに通知する時はnull
+ * @param isTest テスト配信時はtrue
  */
-function specifySettingOrAllSettingReadSlackSettingAndSendToSlack(slackSettingId) {
+function sendToSlackBySpecifyOrAllSlackSettings(slackSettingId, isTest) {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const slackSettingSheet = spreadsheet.getSheetByName(SheetName.SLACK_SETTING);
     if (slackSettingId != null) {
         //特定のslack通知設定を読みこんで、Slackに通知
-        const row = findRow(slackSettingSheet, slackSettingId, SlackSettingSheetColumn.ID)
-        readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row)
+        const row = findRow(slackSettingSheet, slackSettingId, SlackSettingSheetColumn.ID);
+        readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row, isTest)
     } else {
         //全てのslack通知設定を読みこんで、Slackに通知
         const lastRow = slackSettingSheet.getLastRow();
         for (var i = SLACK_SETTING_SHEET_CONTENT_START_INDEX; i <= lastRow; i++) {
-            readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, i)
+            readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, i, isTest)
         }
     }
 }
@@ -103,7 +110,7 @@ function specifySettingOrAllSettingReadSlackSettingAndSendToSlack(slackSettingId
 /**
  * スプレッドシートからSlack通知設定を読み込んで、Slackに通知
  */
-function readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row) {
+function readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row, isTest) {
     const id = slackSettingSheet.getRange(row, SlackSettingSheetColumn.ID).getValue();
     const projectName = slackSettingSheet.getRange(row, SlackSettingSheetColumn.PROJECT_NAME).getValue();
     const version = slackSettingSheet.getRange(row, SlackSettingSheetColumn.VERSION).getValue();
@@ -116,7 +123,7 @@ function readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row) {
     const shouldSendToSlack = slackSettingSheet.getRange(row, SlackSettingSheetColumn.NOTIFICATION_ON_OFF).getValue();
     const message = createMessage(spreadsheet, messageTemplateId, version, dueDate, redMineQueryId);
     if (shouldSendToSlack) {
-        sendMessageToSlack(slackChannelName, userName, iconName, message);
+        sendMessageToSlack(slackChannelName, userName, iconName, message, isTest);
     }
 }
 
@@ -217,6 +224,16 @@ function getTotalEstimateTimeFromRedMine(redMineQueryId) {
         });
     }
     return totalEstimate
+}
+
+/**
+ * 設定したSlack通知設定が適切に動作するかをテスト配信
+ */
+function debugSendToSlack() {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sendTestSheet = spreadsheet.getSheetByName(SheetName.SEND_TEST);
+    const targetId = sendTestSheet.getRange(2, 1).getValue();
+    sendToSlackBySpecifyOrAllSlackSettings(targetId, true);
 }
 
 
