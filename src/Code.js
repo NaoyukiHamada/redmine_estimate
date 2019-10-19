@@ -95,7 +95,8 @@ function sendMessageToSlack(channelName, userName, iconName, message, isTest) {
 function sendToSlackBySpecifyOrAllSlackSettings(slackSettingId, isTest) {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const slackSettingSheet = spreadsheet.getSheetByName(SheetName.SLACK_SETTING);
-    if (slackSettingId != null) {
+    //GASのトリガーで定期実行した時に引数に不正な値が入るので、intかどうかをチェック
+    if (slackSettingId != null && slackSettingId === parseInt(slackSettingId, 10)) {
         //特定のslack通知設定を読みこんで、Slackに通知
         const row = findRow(slackSettingSheet, slackSettingId, SlackSettingSheetColumn.ID);
         readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row, isTest)
