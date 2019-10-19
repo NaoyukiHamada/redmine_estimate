@@ -170,7 +170,7 @@ function createEstimateReportMessage(version, dueDate, message, redMineQueryId, 
     const workingHours = actualWorkingHours || DEFAULT_ACTUAL_WORKING_HOURS;
     //人日を計算
     const manDay = totalEstimateTime / workingHours;
-    return Utilities.formatString(message, version, 23, formattedDueDate, manDay, workingHours, "3日超過", "2日超過", "1日超過", "1日余剰", "2日余剰");
+    return Utilities.formatString(message, version, formattedDueDate, 23, manDay, workingHours, "3日超過", "2日超過", "1日超過", "1日余剰", "2日余剰");
 }
 
 /**
