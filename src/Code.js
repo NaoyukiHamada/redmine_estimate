@@ -31,7 +31,8 @@ var SlackSettingSheetColumn = {
     ICON_NAME: 7,
     MESSAGE_TEMPLATE_ID: 8,
     RED_MINE_QUERY_ID: 9,
-    NOTIFICATION_ON_OFF: 10
+    ACTUAL_WORKING_HOURS: 10,
+    NOTIFICATION_ON_OFF: 11
 };
 
 /**
@@ -49,7 +50,7 @@ var MessageTemplateSheetColumn = {
  * @type {number} 時間
  */
 //gasのバグによりconstでエラーになるので、varを使用
-var ACTUAL_WORKING_HOURS = 7;
+var DEFAULT_ACTUAL_WORKING_HOURS = 7;
 
 /**
  * Slackにメッセージを送信
@@ -120,8 +121,9 @@ function readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row, isT
     const iconName = slackSettingSheet.getRange(row, SlackSettingSheetColumn.ICON_NAME).getValue();
     const messageTemplateId = slackSettingSheet.getRange(row, SlackSettingSheetColumn.MESSAGE_TEMPLATE_ID).getValue();
     const redMineQueryId = slackSettingSheet.getRange(row, SlackSettingSheetColumn.RED_MINE_QUERY_ID).getValue();
+    const actualWorkingHours = slackSettingSheet.getRange(row, SlackSettingSheetColumn.ACTUAL_WORKING_HOURS).getValue();
     const shouldSendToSlack = slackSettingSheet.getRange(row, SlackSettingSheetColumn.NOTIFICATION_ON_OFF).getValue();
-    const message = createMessage(spreadsheet, messageTemplateId, version, dueDate, redMineQueryId);
+    const message = createMessage(spreadsheet, messageTemplateId, version, dueDate, redMineQueryId, actualWorkingHours);
     if (shouldSendToSlack) {
         sendMessageToSlack(slackChannelName, userName, iconName, message, isTest);
     }
@@ -134,15 +136,16 @@ function readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row, isT
  * @param version
  * @param dueDate
  * @param redMineQueryId
+ * @param actualWorkingHours １日の稼働時間
  * @returns {string}
  */
-function createMessage(spreadsheet, messageTemplateId, version, dueDate, redMineQueryId) {
+function createMessage(spreadsheet, messageTemplateId, version, dueDate, redMineQueryId, actualWorkingHours) {
     const messageTemplateSheet = spreadsheet.getSheetByName(SheetName.MESSAGE_TEMPLATE);
     const row = findRow(messageTemplateSheet, messageTemplateId, MessageTemplateSheetColumn.ID);
     var message = messageTemplateSheet.getRange(row, MessageTemplateSheetColumn.MESSAGE).getValue();
     switch (messageTemplateId) {
         case 1: {
-            message = createEstimateReportMessage(version, dueDate, message, redMineQueryId);
+            message = createEstimateReportMessage(version, dueDate, message, redMineQueryId, actualWorkingHours);
             break;
         }
         default : {
@@ -158,13 +161,15 @@ function createMessage(spreadsheet, messageTemplateId, version, dueDate, redMine
  * @param dueDate
  * @param message
  * @param redMineQueryId
+ * @param actualWorkingHours 1日の稼働時間
  */
-function createEstimateReportMessage(version, dueDate, message, redMineQueryId) {
+function createEstimateReportMessage(version, dueDate, message, redMineQueryId, actualWorkingHours) {
     const formattedDueDate = Utilities.formatDate(dueDate, 'JST', 'yyyy/MM/dd');
     const totalEstimateTime = getTotalEstimateTimeFromRedMine(redMineQueryId);
-    //人日
-    const manDay = totalEstimateTime / ACTUAL_WORKING_HOURS;
-    return Utilities.formatString(message, version, 23, formattedDueDate, manDay, ACTUAL_WORKING_HOURS, "3日超過", "2日超過", "1日超過", "1日余剰", "2日余剰");
+    const workingHours = actualWorkingHours || DEFAULT_ACTUAL_WORKING_HOURS;
+    //人日を計算
+    const manDay = totalEstimateTime / workingHours;
+    return Utilities.formatString(message, version, 23, formattedDueDate, manDay, workingHours, "3日超過", "2日超過", "1日超過", "1日余剰", "2日余剰");
 }
 
 /**
