@@ -29,10 +29,11 @@ var SlackSettingSheetColumn = {
     SLACK_CHANNEL_NAME: 5,
     USER_NAME: 6,
     ICON_NAME: 7,
-    MESSAGE_TEMPLATE_ID: 8,
-    RED_MINE_QUERY_ID: 9,
-    ACTUAL_WORKING_HOURS: 10,
-    NOTIFICATION_ON_OFF: 11
+    TITLE: 8,
+    MESSAGE_TEMPLATE_ID: 9,
+    RED_MINE_QUERY_ID: 10,
+    ACTUAL_WORKING_HOURS: 11,
+    NOTIFICATION_ON_OFF: 12
 };
 
 /**
@@ -58,11 +59,17 @@ var DEFAULT_ACTUAL_WORKING_HOURS = 7;
  * @param channelName チェンネル名 publicチャンネルの場合は#を頭につける
  * @param userName ユーザー名
  * @param iconName アイコン名 カスタム絵文字を利用可能 e.g. :memo:
+ * @param title
  * @param message メッセージ
  * @param isTest テスト配信時はtrue
  */
-function sendMessageToSlack(channelName, userName, iconName, message, isTest) {
-    const slackSendMessageUrl = 'https://slack.com/api/chat.postMessage';
+function sendMessageToSlack(channelName, userName, iconName, title, message, isTest) {
+    // const slackSendMessageUrl = 'https://slack.com/api/chat.postMessage';
+    const slackSendMessageUrl = 'https://hooks.slack.com/services/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';
+
+    if (title != null && title.length > 0) {
+        message = '*' + title + '*\n\n' + message;
+    }
 
     if (isTest != null && isTest) {
         message = '*テスト配信*\n\n' + message;
@@ -70,18 +77,20 @@ function sendMessageToSlack(channelName, userName, iconName, message, isTest) {
 
     const payload =
         {
-            "token": PropertiesService.getScriptProperties().getProperty('slack_access_token'),
+            // "token": PropertiesService.getScriptProperties().getProperty('slack_access_token'),
             "channel": channelName || "#random",
             "username": userName || "Bot",
             "icon_emoji": iconName || ":robot_face:",
             "text": message || "no message"
         };
 
+
     const options =
         {
             "method": "post",
-            "contentType": "application/x-www-form-urlencoded",
-            "payload": payload
+            // "contentType": "application/x-www-form-urlencoded",
+            // "payload": JSON.payload
+            "payload": JSON.stringify(payload)
         };
 
     UrlFetchApp.fetch(slackSendMessageUrl, options);
@@ -120,13 +129,14 @@ function readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row, isT
     const slackChannelName = slackSettingSheet.getRange(row, SlackSettingSheetColumn.SLACK_CHANNEL_NAME).getValue();
     const userName = slackSettingSheet.getRange(row, SlackSettingSheetColumn.USER_NAME).getValue();
     const iconName = slackSettingSheet.getRange(row, SlackSettingSheetColumn.ICON_NAME).getValue();
+    const title = slackSettingSheet.getRange(row, SlackSettingSheetColumn.TITLE).getValue();
     const messageTemplateId = slackSettingSheet.getRange(row, SlackSettingSheetColumn.MESSAGE_TEMPLATE_ID).getValue();
     const redMineQueryId = slackSettingSheet.getRange(row, SlackSettingSheetColumn.RED_MINE_QUERY_ID).getValue();
     const actualWorkingHours = slackSettingSheet.getRange(row, SlackSettingSheetColumn.ACTUAL_WORKING_HOURS).getValue();
     const shouldSendToSlack = slackSettingSheet.getRange(row, SlackSettingSheetColumn.NOTIFICATION_ON_OFF).getValue();
     const message = createMessage(spreadsheet, messageTemplateId, version, dueDate, redMineQueryId, actualWorkingHours);
     if (shouldSendToSlack) {
-        sendMessageToSlack(slackChannelName, userName, iconName, message, isTest);
+        sendMessageToSlack(slackChannelName, userName, iconName, title, message, isTest);
     }
 }
 
