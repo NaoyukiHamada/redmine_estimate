@@ -59,49 +59,64 @@ var ACTUAL_WORKING_HOURS = 7;
  * @param message メッセージ
  */
 function sendMessageToSlack(channelName, userName, iconName, message) {
-    const slackWebHookUrl = 'https://hooks.slack.com/services/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';
+    const slackSendMessageUrl = 'https://slack.com/api/chat.postMessage';
 
-    const jsonData =
+    const payload =
         {
+            "token": PropertiesService.getScriptProperties().getProperty('slack_access_token'),
             "channel": channelName || "#random",
             "username": userName || "Bot",
             "icon_emoji": iconName || ":robot_face:",
             "text": message || "no message"
         };
-    const payload = JSON.stringify(jsonData);
 
     const options =
         {
             "method": "post",
-            "contentType": "application/json",
+            "contentType": "application/x-www-form-urlencoded",
             "payload": payload
         };
-    UrlFetchApp.fetch(slackWebHookUrl, options);
+
+    UrlFetchApp.fetch(slackSendMessageUrl, options);
+}
+
+/**
+ * 特定のSlack設定に応じて、もしくは全てのSlack設定に応じて、Slackに通知
+ * @param slackSettingId
+ */
+function specifySettingOrAllSettingReadSlackSettingAndSendToSlack(slackSettingId) {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const slackSettingSheet = spreadsheet.getSheetByName(SheetName.SLACK_SETTING);
+    if (slackSettingId != null) {
+        //特定のslack通知設定を読みこんで、Slackに通知
+        const row = findRow(slackSettingSheet, slackSettingId, SlackSettingSheetColumn.ID)
+        readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row)
+    } else {
+        //全てのslack通知設定を読みこんで、Slackに通知
+        const lastRow = slackSettingSheet.getLastRow();
+        for (var i = SLACK_SETTING_SHEET_CONTENT_START_INDEX; i <= lastRow; i++) {
+            readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, i)
+        }
+    }
 }
 
 /**
  * スプレッドシートからSlack通知設定を読み込んで、Slackに通知
  */
-function readSlackSettingAndSendToSlack() {
-    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const slackSettingSheet = spreadsheet.getSheetByName(SheetName.SLACK_SETTING);
-    //シートの中身を読みこみ
-    const lastRow = slackSettingSheet.getLastRow();
-    for (var i = SLACK_SETTING_SHEET_CONTENT_START_INDEX; i <= lastRow; i++) {
-        const id = slackSettingSheet.getRange(i, SlackSettingSheetColumn.ID).getValue();
-        const projectName = slackSettingSheet.getRange(i, SlackSettingSheetColumn.PROJECT_NAME).getValue();
-        const version = slackSettingSheet.getRange(i, SlackSettingSheetColumn.VERSION).getValue();
-        const dueDate = slackSettingSheet.getRange(i, SlackSettingSheetColumn.DUE_DATE).getValue();
-        const slackChannelName = slackSettingSheet.getRange(i, SlackSettingSheetColumn.SLACK_CHANNEL_NAME).getValue();
-        const userName = slackSettingSheet.getRange(i, SlackSettingSheetColumn.USER_NAME).getValue();
-        const iconName = slackSettingSheet.getRange(i, SlackSettingSheetColumn.ICON_NAME).getValue();
-        const messageTemplateId = slackSettingSheet.getRange(i, SlackSettingSheetColumn.MESSAGE_TEMPLATE_ID).getValue();
-        const redMineQueryId = slackSettingSheet.getRange(i, SlackSettingSheetColumn.RED_MINE_QUERY_ID).getValue();
-        const shouldSendToSlack = slackSettingSheet.getRange(i, SlackSettingSheetColumn.NOTIFICATION_ON_OFF).getValue();
-        const message = createMessage(spreadsheet, messageTemplateId, version, dueDate, redMineQueryId);
-        if (shouldSendToSlack) {
-            sendMessageToSlack(slackChannelName, userName, iconName, message);
-        }
+function readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row) {
+    const id = slackSettingSheet.getRange(row, SlackSettingSheetColumn.ID).getValue();
+    const projectName = slackSettingSheet.getRange(row, SlackSettingSheetColumn.PROJECT_NAME).getValue();
+    const version = slackSettingSheet.getRange(row, SlackSettingSheetColumn.VERSION).getValue();
+    const dueDate = slackSettingSheet.getRange(row, SlackSettingSheetColumn.DUE_DATE).getValue();
+    const slackChannelName = slackSettingSheet.getRange(row, SlackSettingSheetColumn.SLACK_CHANNEL_NAME).getValue();
+    const userName = slackSettingSheet.getRange(row, SlackSettingSheetColumn.USER_NAME).getValue();
+    const iconName = slackSettingSheet.getRange(row, SlackSettingSheetColumn.ICON_NAME).getValue();
+    const messageTemplateId = slackSettingSheet.getRange(row, SlackSettingSheetColumn.MESSAGE_TEMPLATE_ID).getValue();
+    const redMineQueryId = slackSettingSheet.getRange(row, SlackSettingSheetColumn.RED_MINE_QUERY_ID).getValue();
+    const shouldSendToSlack = slackSettingSheet.getRange(row, SlackSettingSheetColumn.NOTIFICATION_ON_OFF).getValue();
+    const message = createMessage(spreadsheet, messageTemplateId, version, dueDate, redMineQueryId);
+    if (shouldSendToSlack) {
+        sendMessageToSlack(slackChannelName, userName, iconName, message);
     }
 }
 
