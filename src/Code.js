@@ -83,7 +83,7 @@ var HOLIDAY_SHEET_CONTENT_START_INDEX = 2;
  */
 function sendMessageToSlack(channelName, userName, iconName, title, message, isTest) {
     // const slackSendMessageUrl = 'https://slack.com/api/chat.postMessage';
-    const slackSendMessageUrl = 'https://hooks.slack.com/services/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';
+    const slackSendMessageUrl = 'https://hooks.slack.com/services/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';
 
     if (title != null && title.length > 0) {
         message = '*' + title + '*\n\n' + message;
@@ -199,7 +199,37 @@ function createEstimateReportMessage(version, dueDate, message, redMineQueryId, 
     const actualWorkingDay = getActualWorkDay(null, dueDate);
     //人日を計算
     const manDay = totalEstimateTime / workingHours;
-    return Utilities.formatString(message, version, formattedDueDate, actualWorkingDay, manDay, workingHours, "3日超過", "2日超過", "1日超過", "1日余剰", "2日余剰");
+    //超過もしくは余剰分を計算
+    var overDayForOne = manDay - actualWorkingDay;
+    var overDayForOnePointFive = manDay / 1.5 - actualWorkingDay;
+    var overDayForTwo = manDay / 2 - actualWorkingDay;
+    var overDayForTwoPointFive = manDay / 2.5 - actualWorkingDay;
+    var overDayForThree = manDay / 3 - actualWorkingDay;
+
+    /**
+     * 工数超過参考値用のメッセージ作成
+     *
+     * @param overDay
+     * @returns {string}
+     */
+    function createOverDayMessage(overDay) {
+        return overDay.toFixed(1) + "日"
+    }
+
+    return Utilities
+        .formatString(
+            message,
+            version,
+            formattedDueDate,
+            actualWorkingDay,
+            manDay,
+            workingHours,
+            createOverDayMessage(overDayForOne),
+            createOverDayMessage(overDayForOnePointFive),
+            createOverDayMessage(overDayForTwo),
+            createOverDayMessage(overDayForTwoPointFive),
+            createOverDayMessage(overDayForThree)
+        );
 }
 
 /**
@@ -290,8 +320,9 @@ function getActualWorkDay(startDay, endDay) {
 
     //締切日になるまで、日付を進めて、稼働日数をカウント
     var workDayCount = 0;
+    var otherHolidays = getOtherHolidays();
     do {
-        if (!isOff(targetDay)) {
+        if (!isOff(targetDay, otherHolidays)) {
             workDayCount++
         }
         targetDay = goToNextDay(targetDay);
@@ -302,9 +333,10 @@ function getActualWorkDay(startDay, endDay) {
 /**
  * 休みか判定
  * @param targetDay 判定する日
+ * @param otherHolidays その他の休み 毎回getRange.getValueで読み込むと、「読み込みすぎだ」と怒られるので、引数で取得
  * @returns {boolean} 休みか
  */
-function isOff(targetDay) {
+function isOff(targetDay, otherHolidays) {
     /**
      * 祝日か
      * @returns {boolean} 終日か
@@ -327,17 +359,14 @@ function isOff(targetDay) {
 
     /**
      * 土日祝以外の休日か
-     * 休日シートを読み込んでチェック
      * @param targetDay
+     * @param otherHolidays 土日祝以外の休みリスト
      * @returns {boolean} 土日祝以外の休日か
      */
-    function isOtherOff(targetDay) {
-        const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-        const holidaySheet = spreadsheet.getSheetByName(SheetName.HOLIDAY);
-        const lastRow = holidaySheet.getLastRow();
+    function isOtherOff(targetDay, otherHolidays) {
         var isOtherOff = false;
-        for (var i = HOLIDAY_SHEET_CONTENT_START_INDEX; i <= lastRow; i++) {
-            var holiday = holidaySheet.getRange(i, HolidaySheetColumn.HOLIDAY).getValue();
+        for (var i = 0; i < otherHolidays.length; i++) {
+            var holiday = otherHolidays[i];
             if (targetDay.getTime() === holiday.getTime()) {
                 isOtherOff = true;
             }
@@ -345,7 +374,23 @@ function isOff(targetDay) {
         return isOtherOff;
     }
 
-    return isHoliday(targetDay) || isWeekend(targetDay) || isOtherOff(targetDay);
+    return isHoliday(targetDay) || isWeekend(targetDay) || isOtherOff(targetDay, otherHolidays);
+}
+
+/**
+ * 土日祝以外の休みを休日シートから取得
+ * @returns {[]} 土日祝以外の休みリスト
+ */
+function getOtherHolidays() {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const holidaySheet = spreadsheet.getSheetByName(SheetName.HOLIDAY);
+    const lastRow = holidaySheet.getLastRow();
+    var otherHolidays = [];
+    for (var i = HOLIDAY_SHEET_CONTENT_START_INDEX; i <= lastRow; i++) {
+        var holiday = holidaySheet.getRange(i, HolidaySheetColumn.HOLIDAY).getValue();
+        otherHolidays.push(holiday);
+    }
+    return otherHolidays;
 }
 
 /**
