@@ -6,7 +6,8 @@
 var SheetName = {
     SLACK_SETTING: 'SlackSetting',
     MESSAGE_TEMPLATE: 'MessageTemplate',
-    SEND_TEST: "テスト配信"
+    SEND_TEST: "テスト配信",
+    HOLIDAY: '休日'
 };
 
 /**
@@ -37,6 +38,16 @@ var SlackSettingSheetColumn = {
 };
 
 /**
+ * 休日シートの各カラムEnum
+ * @type {{HOLIDAY: number}}
+ */
+//gasのバグによりconstでエラーになるので、varを使用
+var HolidaySheetColumn = {
+    HOLIDAY: 1,
+};
+
+
+/**
  * MessageTemplateシートの各カラムEnum
  * @type {{MESSAGE: number, ID: number}}
  */
@@ -54,6 +65,13 @@ var MessageTemplateSheetColumn = {
 var DEFAULT_ACTUAL_WORKING_HOURS = 7;
 
 /**
+ * 休日シートのコンテンツの行始め
+ * @type {number}
+ */
+//gasのバグによりconstでエラーになるので、varを使用
+var HOLIDAY_SHEET_CONTENT_START_INDEX = 2;
+
+/**
  * Slackにメッセージを送信
  *
  * @param channelName チェンネル名 publicチャンネルの場合は#を頭につける
@@ -65,7 +83,7 @@ var DEFAULT_ACTUAL_WORKING_HOURS = 7;
  */
 function sendMessageToSlack(channelName, userName, iconName, title, message, isTest) {
     // const slackSendMessageUrl = 'https://slack.com/api/chat.postMessage';
-    const slackSendMessageUrl = 'https://hooks.slack.com/services/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';
+    const slackSendMessageUrl = 'https://hooks.slack.com/services/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';
 
     if (title != null && title.length > 0) {
         message = '*' + title + '*\n\n' + message;
@@ -178,9 +196,10 @@ function createEstimateReportMessage(version, dueDate, message, redMineQueryId, 
     const formattedDueDate = Utilities.formatDate(dueDate, 'JST', 'yyyy/MM/dd');
     const totalEstimateTime = getTotalEstimateTimeFromRedMine(redMineQueryId);
     const workingHours = actualWorkingHours || DEFAULT_ACTUAL_WORKING_HOURS;
+    const actualWorkingDay = getActualWorkDay(null, dueDate);
     //人日を計算
     const manDay = totalEstimateTime / workingHours;
-    return Utilities.formatString(message, version, formattedDueDate, 23, manDay, workingHours, "3日超過", "2日超過", "1日超過", "1日余剰", "2日余剰");
+    return Utilities.formatString(message, version, formattedDueDate, actualWorkingDay, manDay, workingHours, "3日超過", "2日超過", "1日超過", "1日余剰", "2日余剰");
 }
 
 /**
@@ -250,6 +269,96 @@ function debugSendToSlack() {
     const sendTestSheet = spreadsheet.getSheetByName(SheetName.SEND_TEST);
     const targetId = sendTestSheet.getRange(2, 1).getValue();
     sendToSlackBySpecifyOrAllSlackSettings(targetId, true);
+}
+
+/**
+ * 指定した日付の間の稼動日数を取得(開始日を含む稼働日数)
+ * startDayを指定しない場合は現在の日付との間で計算
+ * @param startDay 開始日 nullable
+ * @param endDay 締切日
+ * @returns {number} 稼働日数
+ */
+function getActualWorkDay(startDay, endDay) {
+    var targetDay;
+    if (startDay == null) {
+        var today = new Date();
+        //今日の0時を取得するために一度format
+        targetDay = new Date(Utilities.formatDate(today, 'JST', 'yyyy/MM/dd'));
+    } else {
+        targetDay = new Date(Utilities.formatDate(startDay, 'JST', 'yyyy/MM/dd'));
+    }
+
+    //締切日になるまで、日付を進めて、稼働日数をカウント
+    var workDayCount = 0;
+    do {
+        if (!isOff(targetDay)) {
+            workDayCount++
+        }
+        targetDay = goToNextDay(targetDay);
+    } while (targetDay.getTime() <= endDay.getTime());
+    return workDayCount;
+}
+
+/**
+ * 休みか判定
+ * @param targetDay 判定する日
+ * @returns {boolean} 休みか
+ */
+function isOff(targetDay) {
+    /**
+     * 祝日か
+     * @returns {boolean} 終日か
+     */
+    function isHoliday(targetDay) {
+        const calendars = CalendarApp.getCalendarsByName('日本の祝日');
+        const count = calendars[0].getEventsForDay(targetDay).length;
+        return count === 1;
+    }
+
+    /**
+     * 週末か
+     * @returns {boolean}
+     */
+    function isWeekend(targetDay) {
+        const day = targetDay.getDay();
+        return (day === 6) || (day === 0);
+    }
+
+
+    /**
+     * 土日祝以外の休日か
+     * 休日シートを読み込んでチェック
+     * @param targetDay
+     * @returns {boolean} 土日祝以外の休日か
+     */
+    function isOtherOff(targetDay) {
+        const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+        const holidaySheet = spreadsheet.getSheetByName(SheetName.HOLIDAY);
+        const lastRow = holidaySheet.getLastRow();
+        var isOtherOff = false;
+        for (var i = HOLIDAY_SHEET_CONTENT_START_INDEX; i <= lastRow; i++) {
+            var holiday = holidaySheet.getRange(i, HolidaySheetColumn.HOLIDAY).getValue();
+            if (targetDay.getTime() === holiday.getTime()) {
+                isOtherOff = true;
+            }
+        }
+        return isOtherOff;
+    }
+
+    return isHoliday(targetDay) || isWeekend(targetDay) || isOtherOff(targetDay);
+}
+
+/**
+ * 指定の日の次の日を取得
+ * @param targetDay
+ * @returns {Date}
+ */
+function goToNextDay(targetDay) {
+    //次の日をミリ秒で取得
+    var date = targetDay.setDate(targetDay.getDate() + 1);
+    //ミリ秒からDateオブジェクトを作成
+    date = new Date(date);
+    return date;
 }
 
 
