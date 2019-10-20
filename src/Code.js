@@ -65,7 +65,7 @@ var DEFAULT_ACTUAL_WORKING_HOURS = 7;
  */
 function sendMessageToSlack(channelName, userName, iconName, title, message, isTest) {
     // const slackSendMessageUrl = 'https://slack.com/api/chat.postMessage';
-    const slackSendMessageUrl = 'https://hooks.slack.com/services/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';
+    const slackSendMessageUrl = 'https://hooks.slack.com/services/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';
 
     if (title != null && title.length > 0) {
         message = '*' + title + '*\n\n' + message;
@@ -78,7 +78,7 @@ function sendMessageToSlack(channelName, userName, iconName, title, message, isT
     const payload =
         {
             // "token": PropertiesService.getScriptProperties().getProperty('slack_access_token'),
-            "channel": channelName || "#random",
+            // "channel": channelName || "#random",
             "username": userName || "Bot",
             "icon_emoji": iconName || ":robot_face:",
             "text": message || "no message"
