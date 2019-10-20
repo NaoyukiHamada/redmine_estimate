@@ -213,7 +213,11 @@ function createEstimateReportMessage(version, dueDate, message, redMineQueryId, 
      * @returns {string}
      */
     function createOverDayMessage(overDay) {
-        return overDay.toFixed(1) + "日"
+        if (overDay > 0) {
+            return overDay.toFixed(1) + "日超過"
+        } else {
+            return overDay.toFixed(1) + "日"
+        }
     }
 
     return Utilities
