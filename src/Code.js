@@ -83,7 +83,7 @@ var HOLIDAY_SHEET_CONTENT_START_INDEX = 2;
  */
 function sendMessageToSlack(channelName, userName, iconName, title, message, isTest) {
     // const slackSendMessageUrl = 'https://slack.com/api/chat.postMessage';
-    const slackSendMessageUrl = 'https://hooks.slack.com/services/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';
+    const slackSendMessageUrl = 'https://hooks.slack.com/services/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';
 
     if (title != null && title.length > 0) {
         message = '*' + title + '*\n\n' + message;
