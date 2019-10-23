@@ -426,4 +426,32 @@ function goToNextDay(targetDay) {
     return date;
 }
 
+function doPost(e) {
+    // 取得したパラメータ(JSON)をパース
+    // var params = JSON.parse(e.postData.getDataAsString());
+    // パラメータから対象の値を抽出
+    try {
+        var value0 = e.parameter.text;
+        // 何らかの処理...(例: ログ出力)
+        Logger.log("value: " + value0);
+        var value = e.parameter.text.split(' ');
+        var slackSettingId = value[0];
+        var manualEstimateTime = value[1];
+        const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+        const slackSettingSheet = spreadsheet.getSheetByName(SheetName.SLACK_SETTING);
+        var row = findRow(slackSettingSheet, slackSettingId, SlackSettingSheetColumn.ID);
+        slackSettingSheet.getRange(row, SlackSettingSheetColumn.MANUAL_TOTAL_ESTIMATE_TIME).setValue(manualEstimateTime);
+
+        // 結果を返す
+        return ContentService.createTextOutput(JSON.stringify({
+            response_type: 'in_channel',
+            text: 'success' })).setMimeType(ContentService.MimeType.JSON);
+    } catch (e) {
+        // 結果を返す
+        return ContentService.createTextOutput(JSON.stringify({
+            response_type: 'in_channel',
+            text: 'failed' })).setMimeType(ContentService.MimeType.JSON);
+    }
+}
+
 
