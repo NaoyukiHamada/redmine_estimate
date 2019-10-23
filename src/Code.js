@@ -34,7 +34,8 @@ var SlackSettingSheetColumn = {
     MESSAGE_TEMPLATE_ID: 9,
     RED_MINE_QUERY_ID: 10,
     ACTUAL_WORKING_HOURS: 11,
-    NOTIFICATION_ON_OFF: 12
+    MANUAL_TOTAL_ESTIMATE_TIME: 12,
+    NOTIFICATION_ON_OFF: 13
 };
 
 /**
@@ -152,7 +153,7 @@ function readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row, isT
     const redMineQueryId = slackSettingSheet.getRange(row, SlackSettingSheetColumn.RED_MINE_QUERY_ID).getValue();
     const actualWorkingHours = slackSettingSheet.getRange(row, SlackSettingSheetColumn.ACTUAL_WORKING_HOURS).getValue();
     const shouldSendToSlack = slackSettingSheet.getRange(row, SlackSettingSheetColumn.NOTIFICATION_ON_OFF).getValue();
-    const message = createMessage(spreadsheet, messageTemplateId, version, dueDate, redMineQueryId, actualWorkingHours);
+    const message = createMessage(spreadsheet, id, messageTemplateId, version, dueDate, redMineQueryId, actualWorkingHours);
     if (shouldSendToSlack) {
         sendMessageToSlack(slackChannelName, userName, iconName, title, message, isTest);
     }
@@ -161,6 +162,7 @@ function readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row, isT
 /**
  * MessageTemplateIdからメッセージを作成
  * @param spreadsheet
+ * @param slackSettingId
  * @param messageTemplateId
  * @param version
  * @param dueDate
@@ -168,13 +170,13 @@ function readSlackSettingAndSendToSlack(spreadsheet, slackSettingSheet, row, isT
  * @param actualWorkingHours １日の稼働時間
  * @returns {string}
  */
-function createMessage(spreadsheet, messageTemplateId, version, dueDate, redMineQueryId, actualWorkingHours) {
+function createMessage(spreadsheet, slackSettingId, messageTemplateId, version, dueDate, redMineQueryId, actualWorkingHours) {
     const messageTemplateSheet = spreadsheet.getSheetByName(SheetName.MESSAGE_TEMPLATE);
     const row = findRow(messageTemplateSheet, messageTemplateId, MessageTemplateSheetColumn.ID);
     var message = messageTemplateSheet.getRange(row, MessageTemplateSheetColumn.MESSAGE).getValue();
     switch (messageTemplateId) {
         case 1: {
-            message = createEstimateReportMessage(version, dueDate, message, redMineQueryId, actualWorkingHours);
+            message = createEstimateReportMessage(spreadsheet, slackSettingId, version, dueDate, message, redMineQueryId, actualWorkingHours);
             break;
         }
         default : {
@@ -186,15 +188,17 @@ function createMessage(spreadsheet, messageTemplateId, version, dueDate, redMine
 
 /**
  * 進捗定期報告用のメッセージ作成
+ * @param spreadsheet
+ * @param slackSettingId
  * @param version
  * @param dueDate
  * @param message
  * @param redMineQueryId
  * @param actualWorkingHours 1日の稼働時間
  */
-function createEstimateReportMessage(version, dueDate, message, redMineQueryId, actualWorkingHours) {
+function createEstimateReportMessage(spreadsheet, slackSettingId, version, dueDate, message, redMineQueryId, actualWorkingHours) {
     const formattedDueDate = Utilities.formatDate(dueDate, 'JST', 'yyyy/MM/dd');
-    const totalEstimateTime = getTotalEstimateTimeFromRedMine(redMineQueryId);
+    const totalEstimateTime = getTotalEstimateTimeFromRedMine(spreadsheet, slackSettingId, redMineQueryId);
     const workingHours = actualWorkingHours || DEFAULT_ACTUAL_WORKING_HOURS;
     const actualWorkingDay = getActualWorkDay(null, dueDate);
     //人日を計算
@@ -228,6 +232,7 @@ function createEstimateReportMessage(version, dueDate, message, redMineQueryId, 
             actualWorkingDay,
             manDay,
             workingHours,
+            totalEstimateTime,
             createOverDayMessage(overDayForOne),
             createOverDayMessage(overDayForOnePointFive),
             createOverDayMessage(overDayForTwo),
@@ -259,10 +264,21 @@ function findRow(sheet, val, col) {
  * チケットの進捗率に応じて合計予定工数を削減
  * RedmineAPIの制限で一度に取得できるチケットは100件まで
  *
+ * @param spreadsheet
+ * @param slackSettingId
  * @param redMineQueryId redmineで作成したカスタムクエリのID(カスタムクエリを開いた時のURLに記載)
  * @returns {number} 合計予定工数
  */
-function getTotalEstimateTimeFromRedMine(redMineQueryId) {
+function getTotalEstimateTimeFromRedMine(spreadsheet, slackSettingId, redMineQueryId) {
+    //合計見積もり時間が手動で入力されている場合はそれを取得
+    var slackSettingSheet = spreadsheet.getSheetByName(SheetName.SLACK_SETTING);
+    var row = findRow(slackSettingSheet, slackSettingId, SlackSettingSheetColumn.ID);
+    var manualTotalEstimateTime = slackSettingSheet.getRange(row, SlackSettingSheetColumn.MANUAL_TOTAL_ESTIMATE_TIME).getValue();
+    if (manualTotalEstimateTime !== -1) {
+        return manualTotalEstimateTime;
+    }
+
+    //Redmineのカスタムクエリから合計見積もり時間を取得
     const baseUrl = 'https://www2195ue.sakura.ne.jp/redmine/';
     const path = 'issues.json';
     const token = PropertiesService.getScriptProperties().getProperty('red_mine_token');
